@@ -1,0 +1,21 @@
+# Pinned upstream clone (MystenLabs/deepbookv3) — reproduced by scripts/run-predict-tests.sh
+external/
+
+# Project-local Sui config — HOLDS THE PRIVATE KEYSTORE, must never be committed
+.sui/
+
+# Move build artifacts
+build/
+**/build/
+
+# Node / frontend (added in later gates)
+node_modules/
+.next/
+.env
+.env.local
+
+# Local Claude Code overrides (personal, not shared)
+.claude/settings.local.json
+
+# OS / editor
+.DS_Store
