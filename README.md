@@ -84,5 +84,9 @@ external/                  (gitignored) pinned MystenLabs/deepbookv3 clone — a
 - **Gate 1b (live testnet):** once DUSDC lands in the project address, run the same proven flows as real PTBs against the deployed Predict object and link tx hashes here.
 - **Resolve testnet ids** for the live Open path: the DUSDC coin type (from the faucet), a zero-DEEP / whitelisted Spot pool + base, the live `OracleSVI` object, and our published `loopvault` package id. Each is a single line in the config module; `assertResolved()` enforces no placeholders ship.
 
-## Confirmed early (de-risks the smile renderer)
-The SVI surface event `OracleSVIUpdated` encodes `a:u64, b:u64, rho:i64::I64, m:i64::I64, sigma:u64` (all ×`FLOAT_SCALING`=1e9), where `i64::I64 = { magnitude:u64, is_negative:bool }`. `rho`/`m` are **signed structs** — decoded field-by-field in `app/src/lib/i64.ts`, or the surface silently corrupts.
+## Verified against the real surface (not assumed)
+The SVI event `OracleSVIUpdated` encodes `a:u64, b:u64, rho:i64::I64, m:i64::I64, sigma:u64` (all ×`FLOAT_SCALING`=1e9), where `i64::I64 = { magnitude:u64, is_negative:bool }` — `rho`/`m` are **signed**, decoded field-by-field in `app/src/lib/i64.ts` or the surface silently corrupts.
+
+This is **verified, not assumed**, two ways:
+1. **Against source:** the pricing in `app/src/lib/{svi,delta}.ts` matches `deepbook_predict::oracle::compute_nd2` (`oracle.move:397-428`) line-for-line — `k = ln(K/F)`, `w(k) = a + b·(rho·(k−m) + √((k−m)²+σ²))`, `d2 = −((k+w/2)/√w)`, UP = `N(d2)`, DOWN = `1−UP`.
+2. **Against live testnet:** `app/src/lib/liveOracle.test.ts` bakes in **real** `OracleSVIUpdated` events and a real BTC `OracleSVI` object pulled from `fullnode.testnet.sui.io` (forward **$62,628**, spot $62,627, `rho = −0.940`, ~**39%** ATM IV) and asserts our decoder reproduces them — so "we read the real surface" is a passing test, and `fetchBtcOracleSnapshot()` is ready to wire as a live feed.

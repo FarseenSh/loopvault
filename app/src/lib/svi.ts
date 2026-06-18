@@ -3,7 +3,13 @@
 //
 // Total implied variance at log-moneyness k:
 //   w(k) = a + b * ( rho*(k - m) + sqrt((k - m)^2 + sigma^2) )
-// (matches deepbook_predict::oracle::compute_nd2)
+//
+// VERIFIED line-for-line against deepbook_predict::oracle::compute_nd2
+// (predict-testnet-4-16, oracle.move:397-428): k = ln(strike/forward),
+// inner = rho*(k-m) + sqrt((k-m)^2 + sigma^2) [asserted >= 0],
+// total_var = a + b*inner, d2 = -((k + w/2)/sqrt(w)), UP price = N(d2),
+// DOWN = 1 - UP. The event encodes a,b,sigma as u64 and rho,m as the SIGNED
+// i64::I64 { magnitude:u64, is_negative:bool } (i64.move:13) — decoded in ./i64.
 
 import { decodeI64Scaled, decodeU64Scaled, type I64 } from "./i64";
 
