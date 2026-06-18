@@ -227,6 +227,33 @@ a {
   color: #1a0408;
   box-shadow: 0 8px 30px var(--down-glow);
 }
+.btn-google {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 14px;
+  background: #fff;
+  color: #1f1f1f;
+  border-color: #fff;
+  font-weight: 600;
+}
+.btn-google:hover {
+  filter: brightness(0.97);
+}
+.linkbtn {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0 0 0 4px;
+  text-decoration: underline;
+}
+.linkbtn:hover {
+  color: var(--text);
+}
 
 /* ---- segmented ---- */
 .seg {

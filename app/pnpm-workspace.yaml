@@ -3,3 +3,10 @@
 allowBuilds:
   esbuild: true
   sharp: true
+minimumReleaseAgeExclude:
+  - '@mysten/dapp-kit@1.1.1'
+  - '@mysten/enoki@1.1.1'
+  - '@mysten/slush-wallet@1.1.1'
+  - '@mysten/sui@2.19.0'
+  - '@mysten/wallet-standard@0.21.1'
+  - '@mysten/webcrypto-signer@0.2.1'

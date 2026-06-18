@@ -5,6 +5,7 @@ import { SuiClientProvider, WalletProvider, createNetworkConfig } from "@mysten/
 import { getJsonRpcFullnodeUrl } from "@mysten/sui/jsonRpc";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState, type ReactNode } from "react";
+import { RegisterEnokiWallets } from "../components/RegisterEnokiWallets";
 
 // @mysten/sui v2: the JSON-RPC client moved under /jsonRpc and a network config now
 // requires BOTH a url/transport AND an explicit `network` tag.
@@ -18,7 +19,10 @@ export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <SuiClientProvider networks={networkConfig} defaultNetwork="testnet">
-        <WalletProvider autoConnect>{children}</WalletProvider>
+        <WalletProvider autoConnect>
+          <RegisterEnokiWallets />
+          {children}
+        </WalletProvider>
       </SuiClientProvider>
     </QueryClientProvider>
   );

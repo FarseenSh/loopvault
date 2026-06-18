@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ConnectButton } from "@mysten/dapp-kit";
+import { AuthControls } from "../components/AuthControls";
 import { useMarketFeed, useNow } from "../hooks/useMarketFeed";
 import { atmImpliedVol, fmtPct, fmtUsd } from "../lib/market";
 import { CFG, NETWORK, unresolvedIds } from "../config/loopvault.config";
@@ -38,7 +38,7 @@ export default function Page() {
             <span className={`dot ${pending ? "warn" : ""}`} />
             {NETWORK} · {pending ? `${pending} ids pending` : "live"}
           </span>
-          <ConnectButton />
+          <AuthControls />
         </div>
       </header>
 
