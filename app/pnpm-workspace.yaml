@@ -2,3 +2,4 @@
 # install script so its native binary links.
 allowBuilds:
   esbuild: true
+  sharp: true
