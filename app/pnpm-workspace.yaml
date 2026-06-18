@@ -1,0 +1,4 @@
+# pnpm reads project settings here. Allow esbuild (vitest's bundler) to run its
+# install script so its native binary links.
+allowBuilds:
+  esbuild: true
