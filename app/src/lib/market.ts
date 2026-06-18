@@ -14,6 +14,7 @@ export interface MarketSnapshot {
   sviTsMs: number; // last OracleSVIUpdated (~10-20s)
   expiryMs: number;
   tenorYears: number;
+  oracleId?: string; // set when sourced from a live on-chain OracleSVI object
 }
 
 const MIN_MS = 60_000;

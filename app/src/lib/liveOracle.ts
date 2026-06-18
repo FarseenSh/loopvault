@@ -103,16 +103,17 @@ export async function fetchBtcOracleSnapshot(
   if (ids.length === 0) return null;
 
   const objs = await rpc(rpcUrl, "sui_multiGetObjects", [ids, { showContent: true }]);
-  const candidates: RawOracleObject[] = (objs ?? [])
-    .map((o: any) => o?.data?.content?.fields)
-    .filter(Boolean)
-    .map((f: any) => normalizeMoveFields(f) as RawOracleObject)
+  const candidates = (objs ?? [])
+    .map((o: any) => ({ id: o?.data?.objectId as string | undefined, fields: o?.data?.content?.fields }))
+    .filter((x: { fields: unknown }) => Boolean(x.fields))
+    .map((x: { id?: string; fields: unknown }) => ({ id: x.id, o: normalizeMoveFields(x.fields) as RawOracleObject }))
     .filter(
-      (o: RawOracleObject) =>
+      ({ o }: { o: RawOracleObject }) =>
         o.underlying_asset === "BTC" && o.active && Number(o.expiry) > nowMs,
     );
   if (candidates.length === 0) return null;
 
-  candidates.sort((a, b) => Number(a.expiry) - Number(b.expiry));
-  return oracleToSnapshot(candidates[0]);
+  candidates.sort((a: { o: RawOracleObject }, b: { o: RawOracleObject }) => Number(a.o.expiry) - Number(b.o.expiry));
+  const best = candidates[0];
+  return { ...oracleToSnapshot(best.o), oracleId: best.id };
 }

@@ -41,7 +41,8 @@ The negative tests pin the **exact** abort code + location, so they cannot pass 
 - **One-tap Trade** — Call/Put, size, a live max-loss-cap slider tied to the `SafeMint` guard; tapping builds the *real* Open PTB and (when ids resolve) signs it, else surfaces the sealed command count.
 - **Live mark-to-market share card** — re-prices **both legs** every tick (digital vs. the SVI surface, hedge vs. the forward) so the net P&L visibly shows the hedge offsetting the directional move.
 - **Block Scholes vol smile** (SVG), an **oracle-freshness countdown** that grays out Open past the 20s deadline, and a "freeze oracle" toggle that demonstrates the gate locking on stale data.
-- `pnpm build` is green (static prerender), `tsc` clean, 13/13 unit tests pass.
+- **Demo ↔ Live testnet toggle** — flip to render the *real* on-chain BTC SVI surface, decoded client-side from read-only RPC (`fetchBtcOracleSnapshot`); the freshness gate then follows the real oracle timestamp.
+- `pnpm build` is green (static prerender), `tsc` clean, 16/16 unit tests pass.
 
 ### 6. zkLogin + gasless — *no seed phrase*
 `app/src/components/{RegisterEnokiWallets,AuthControls}.tsx` register Enoki zkLogin wallets into the wallet-standard registry via `registerEnokiWallets`, so **"Continue with Google"** appears in the normal connect flow and Enoki sponsors gas. It's **env-gated**: with no keys the app cleanly falls back to wallet-extension connect; the Trade/Earn panels are unchanged because they already sign through dapp-kit. Set keys in `.env.local` (see `.env.example`).
@@ -89,4 +90,4 @@ The SVI event `OracleSVIUpdated` encodes `a:u64, b:u64, rho:i64::I64, m:i64::I64
 
 This is **verified, not assumed**, two ways:
 1. **Against source:** the pricing in `app/src/lib/{svi,delta}.ts` matches `deepbook_predict::oracle::compute_nd2` (`oracle.move:397-428`) line-for-line — `k = ln(K/F)`, `w(k) = a + b·(rho·(k−m) + √((k−m)²+σ²))`, `d2 = −((k+w/2)/√w)`, UP = `N(d2)`, DOWN = `1−UP`.
-2. **Against live testnet:** `app/src/lib/liveOracle.test.ts` bakes in **real** `OracleSVIUpdated` events and a real BTC `OracleSVI` object pulled from `fullnode.testnet.sui.io` (forward **$62,628**, spot $62,627, `rho = −0.940`, ~**39%** ATM IV) and asserts our decoder reproduces them — so "we read the real surface" is a passing test, and `fetchBtcOracleSnapshot()` is ready to wire as a live feed.
+2. **Against live testnet:** `app/src/lib/liveOracle.test.ts` bakes in **real** `OracleSVIUpdated` events and a real BTC `OracleSVI` object pulled from `fullnode.testnet.sui.io` (forward **$62,628**, spot $62,627, `rho = −0.940`, ~**39%** ATM IV) and asserts our decoder reproduces them — so "we read the real surface" is a passing test. It's **wired into the app** as a Demo ↔ Live testnet toggle and validated end-to-end against testnet (live BTC forward ~$63k, ~37% ATM IV, oracle age <1s → the Open gate is green on real data).
