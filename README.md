@@ -31,6 +31,16 @@ The negative tests pin the **exact** abort code + location, so they cannot pass 
 - **`safe_mint`** — a struct with **no abilities** (a true hot-potato: it *must* be consumed in the same PTB). `consume()` asserts the oracle is fresh within our *tighter* `oracle_freshness_deadline` (≤ the protocol's 30s) **and** that the cost charged ≤ `max_loss_bps` of the capital base. Can't be dropped, can't be stored — the trade either seals cleanly or the PTB aborts.
 - **`share_card`** (consumer flex / position receipt), **`streak`** (daily-engagement object), and **`config`** (the mainnet toggle). Each module has its own unit tests.
 
+**Proven live on the deployed package (testnet, gas-only — no DUSDC):**
+
+| What | Result | Tx |
+|---|---|---|
+| SafeMint seal **consumes** (fresh + within cap) | `SafeMintSealed` emitted, `oracle_age_ms 12011` < 20000 | [`357Gu5tL…`](https://suiscan.xyz/testnet/tx/357Gu5tL1Sdc7GcqJv8kTHnhgjwrhmU5w7aRh62pZkij) |
+| SafeMint seal **rejects** an over-cap cost | aborts `E_SIZE_EXCEEDED` (code 1) → whole PTB reverts | [`E2uWkrf2…`](https://suiscan.xyz/testnet/tx/E2uWkrf219sBhsXsf24znK2kyJMSL8wkNfBtFdGHzcLw) |
+| ShareCard NFT minted to the user | object `0x7d6a…34d96` | [`Cqnbd3Hs…`](https://suiscan.xyz/testnet/tx/Cqnbd3HsAmad6y1g66f2crjYzbJfcfY6Bh5bo6iB32j9) |
+
+So the seal's guarantee — *fresh-oracle window + `max_loss_bps` cap, or atomic revert* — is verified on-chain on the live package, not just in unit tests.
+
 ### 3. A *genuine* SVI delta hedge — what the Block Scholes judge checks
 `app/src/lib/{svi,delta}.ts` reads the **real** SVI surface and computes a real digital forward-delta — not a 1:1 dummy. A Predict UP position is a cash-or-nothing digital priced `N(d2)`, `d2 = -((k + w/2)/√w)`, `k = ln(K/F)`, `w` the SVI total variance — *exactly* `deepbook_predict::oracle::compute_nd2`. The hedge is its forward delta, and because `w = w(k)`, the derivative carries the **smile slope** `dw/dk`. Validated against a finite-difference bump in `delta.test.ts` (which also shows the naive flat-vol delta is measurably wrong).
 
