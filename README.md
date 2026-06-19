@@ -3,6 +3,8 @@
 **40,000+ people joined the DeepBook Predict consumer waitlist — with no usable interface to trade, and naked one-tap bets are dangerous.** LoopVault is the consumer terminal that makes a Predict trade *one tap, ~6 seconds, no seed phrase (zkLogin), gasless (Enoki), and risk-bounded by an atomic delta-hedge*: a single user-signed PTB atomically **opens** a Predict (vol/directional) position **and** delta-hedges it on DeepBook Spot — sealed by a no-abilities `SafeMint` hot-potato that enforces `max_loss_bps` + an `oracle_freshness_deadline`, so the trade lands fully hedged inside a fresh-oracle window **or rolls back atomically**. It is the Robinhood/Polymarket-grade front end for the only on-chain vol-surface options primitive on Sui.
 
 > Track: **DeepBook Predict** (Sui Overflow 2026). Judged by Aslan Tashtanov (DeepBook Lead — consumer/adoption) and Block Scholes (the SVI vol-oracle team — quant).
+>
+> **🟢 Live on Sui testnet** — `loopvault` package **`0xaf1fdf8441f3d5f0c24beb095b8de144a789f2b76f6f7ca1e6cfc7fe130e18e1`** (modules `safe_mint` · `share_card` · `streak` · `config`); publish tx [`CHjn3Ns2E2o2hhP4n6xLWbj95kv6coKPLnvz3wKHNSoE`](https://suiscan.xyz/testnet/tx/CHjn3Ns2E2o2hhP4n6xLWbj95kv6coKPLnvz3wKHNSoE).
 
 ---
 
@@ -81,9 +83,10 @@ external/                  (gitignored) pinned MystenLabs/deepbookv3 clone — a
 00..03 + CLAUDE.md         Hackathon context, research, PRD, and the build blueprint
 ```
 
-## What's next (genuine external blockers, not design gaps)
-- **Gate 1b (live testnet):** once DUSDC lands in the project address, run the same proven flows as real PTBs against the deployed Predict object and link tx hashes here.
-- **Resolve testnet ids** for the live Open path: the DUSDC coin type (from the faucet), a zero-DEEP / whitelisted Spot pool + base, the live `OracleSVI` object, and our published `loopvault` package id. Each is a single line in the config module; `assertResolved()` enforces no placeholders ship.
+## What's next
+- ✅ **Published `loopvault` to testnet** (package id above) — resolved in the config module; `safe_mint`/`share_card`/`streak` are now live on-chain.
+- **Gate 1b (live testnet):** once DUSDC lands in the project address, run the proven flows as real PTBs against the deployed Predict object and link tx hashes here.
+- **Resolve the remaining ids** for the live Open path: the DUSDC coin type (from the faucet) and a zero-DEEP / whitelisted Spot pool + base for the hedge leg. Each is one line in the config module; `assertResolved()` enforces no placeholders ship.
 
 ## Verified against the real surface (not assumed)
 The SVI event `OracleSVIUpdated` encodes `a:u64, b:u64, rho:i64::I64, m:i64::I64, sigma:u64` (all ×`FLOAT_SCALING`=1e9), where `i64::I64 = { magnitude:u64, is_negative:bool }` — `rho`/`m` are **signed**, decoded field-by-field in `app/src/lib/i64.ts` or the surface silently corrupts.

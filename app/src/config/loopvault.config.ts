@@ -46,7 +46,7 @@ export const TESTNET: LoopVaultConfig = {
   spotPoolId: PLACEHOLDER, // Gate 3: a zero-DEEP / whitelisted stablecoin pool
   deepType: TODO_TYPE, // Gate 3
   hedgeBaseType: TODO_TYPE, // Gate 3
-  loopvaultPkg: PLACEHOLDER, // Gate 5: our published package id
+  loopvaultPkg: "0xaf1fdf8441f3d5f0c24beb095b8de144a789f2b76f6f7ca1e6cfc7fe130e18e1", // Gate 5: PUBLISHED to testnet (tx CHjn3Ns2E2o2hhP4n6xLWbj95kv6coKPLnvz3wKHNSoE)
 };
 
 // Spot/DEEP are ALREADY live on mainnet; the Predict ids are filled day-1.
