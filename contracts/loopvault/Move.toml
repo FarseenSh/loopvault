@@ -5,10 +5,11 @@ version = "0.1.0"
 license = "Apache-2.0"
 
 [dependencies]
-# Pinned to the same Sui framework revision the predict package resolves to, so
-# LoopVault and deepbook_predict compile against one framework. Switch to
-# rev = "framework/testnet" when publishing to testnet.
-Sui = { git = "https://github.com/MystenLabs/sui.git", subdir = "crates/sui-framework/packages/sui-framework", rev = "868c226359ef914f1f3b080518f27eb13d8967f5" }
+# Framework (Sui + MoveStdlib) is added implicitly (Sui >= 1.45) and resolves to the
+# active env's on-chain system packages at publish time — so this package compiles
+# and publishes against testnet's framework with no rev to keep in sync. LoopVault is
+# self-contained (it does NOT depend on deepbook_predict — the Open PTB composes the
+# predict calls at the transaction layer, not as a Move dependency).
 
 [addresses]
 loopvault = "0x0"
