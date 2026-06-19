@@ -94,9 +94,10 @@ external/                  (gitignored) pinned MystenLabs/deepbookv3 clone — a
 ```
 
 ## What's next
-- ✅ **Published `loopvault` to testnet** (package id above) — resolved in the config module; `safe_mint`/`share_card`/`streak` are now live on-chain.
-- **Gate 1b (live testnet):** once DUSDC lands in the project address, run the proven flows as real PTBs against the deployed Predict object and link tx hashes here.
-- **Resolve the remaining ids** for the live Open path: the DUSDC coin type (from the faucet) and a zero-DEEP / whitelisted Spot pool + base for the hedge leg. Each is one line in the config module; `assertResolved()` enforces no placeholders ship.
+- ✅ **Published `loopvault` to testnet** (package id above); `safe_mint`/`share_card`/`streak` are live, and the **SafeMint seal is verified on-chain** (table above).
+- ✅ **`PredictManager` provisioned** for the test address (`0xd0ef…cc82c`, tx [`HgNgiEmB…`](https://suiscan.xyz/testnet/tx/HgNgiEmBtyzBmX3td6pD6syYyre8RFsVNRRPBsENgL77)) — ready to deposit into.
+- **Gate 1b (live deposit+mint):** needs DUSDC in `0x71a7…b690` → then `supply`/`withdraw` + `deposit`+`mint` run as real PTBs, tx hashes linked here.
+- **Resolve remaining ids** for the hedge leg: the DUSDC coin type + a zero-DEEP / whitelisted Spot pool + base. One line each in the config; `assertResolved()` blocks placeholder ships.
 
 ## Verified against the real surface (not assumed)
 The SVI event `OracleSVIUpdated` encodes `a:u64, b:u64, rho:i64::I64, m:i64::I64, sigma:u64` (all ×`FLOAT_SCALING`=1e9), where `i64::I64 = { magnitude:u64, is_negative:bool }` — `rho`/`m` are **signed**, decoded field-by-field in `app/src/lib/i64.ts` or the surface silently corrupts.
