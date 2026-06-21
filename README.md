@@ -1,5 +1,8 @@
 # LoopVault
 
+### ▶ Live demo: **[loopvault-beta.vercel.app](https://loopvault-beta.vercel.app)**
+*One tap, ~6 seconds, no seed phrase, gasless, atomically hedged — live on Sui testnet.*
+
 **40,000+ people joined the DeepBook Predict consumer waitlist — with no usable interface to trade, and naked one-tap bets are dangerous.** LoopVault is the consumer terminal that makes a Predict trade *one tap, ~6 seconds, no seed phrase (zkLogin), gasless (Enoki), and risk-bounded by an atomic delta-hedge*: a single user-signed PTB atomically **opens** a Predict (vol/directional) position **and** delta-hedges it on DeepBook Spot — sealed by a no-abilities `SafeMint` hot-potato that **re-derives the realized cost and the oracle's freshness on-chain** and rolls the whole trade back unless it lands inside a fresh-oracle window, within your max-loss cap. It is the Robinhood/Polymarket-grade front end for the only on-chain vol-surface options primitive on Sui.
 
 > Track: **DeepBook Predict** (Sui Overflow 2026). Judged by Aslan Tashtanov (DeepBook Lead — consumer/adoption) and Block Scholes (the SVI vol-oracle team — quant).
