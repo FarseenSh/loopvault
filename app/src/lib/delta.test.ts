@@ -105,3 +105,17 @@ describe("hedge plan", () => {
     expect(down.positionDelta).toBeCloseTo(-up.positionDelta, 9);
   });
 });
+
+describe("cross-language golden vector (TS ↔ on-chain compute_price)", () => {
+  it("ATM UP digital matches the Move test's pinned on-chain band", () => {
+    // Same params the Move test pins (contracts/predict-tests:
+    // test_compute_price_golden_atm_digital): a=0.01, b=0, rho=0, m=0, sigma=0.1;
+    // F=K=100 ⇒ on-chain oracle::compute_price ∈ [0.480011, 0.480111] (×1e9).
+    const p: SviParams = { a: 0.01, b: 0, rho: 0, m: 0, sigma: 0.1 };
+    const up = binaryUpPrice(100, 100, p);
+    expect(up).toBeGreaterThan(0.480011);
+    expect(up).toBeLessThan(0.480111);
+    // analytic N(-0.05) = 0.4800612 — TS reproduces the on-chain digital to <1e-4.
+    expect(Math.abs(up - 0.4800612)).toBeLessThan(1e-4);
+  });
+});

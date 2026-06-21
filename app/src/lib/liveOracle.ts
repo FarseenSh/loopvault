@@ -98,8 +98,17 @@ export async function fetchBtcOracleSnapshot(
 ): Promise<MarketSnapshot | null> {
   const eventType = `${cfg.predictPkg}::oracle::OracleSVIUpdated`;
   const ev = await rpc(rpcUrl, "suix_queryEvents", [{ MoveEventType: eventType }, null, 25, true]);
-  const rawIds = ((ev?.data ?? []) as any[]).map((e) => e?.parsedJson?.oracle_id);
-  const ids = [...new Set(rawIds)].filter((x): x is string => typeof x === "string");
+  const events = (ev?.data ?? []) as any[];
+  // Events are newest-first → the first timestamp seen per oracle is its latest SVI
+  // update. This is the SURFACE freshness, distinct from the object's price timestamp
+  // (update_svi never bumps oracle.timestamp), so the UI can show how old the smile is.
+  const sviTsByOracle: Record<string, number> = {};
+  for (const e of events) {
+    const oid = e?.parsedJson?.oracle_id;
+    const ts = Number(e?.parsedJson?.timestamp);
+    if (typeof oid === "string" && Number.isFinite(ts) && sviTsByOracle[oid] === undefined) sviTsByOracle[oid] = ts;
+  }
+  const ids = [...new Set(events.map((e) => e?.parsedJson?.oracle_id))].filter((x): x is string => typeof x === "string");
   if (ids.length === 0) return null;
 
   const objs = await rpc(rpcUrl, "sui_multiGetObjects", [ids, { showContent: true }]);
@@ -115,5 +124,7 @@ export async function fetchBtcOracleSnapshot(
 
   candidates.sort((a: { o: RawOracleObject }, b: { o: RawOracleObject }) => Number(a.o.expiry) - Number(b.o.expiry));
   const best = candidates[0];
-  return { ...oracleToSnapshot(best.o), oracleId: best.id };
+  const snap = oracleToSnapshot(best.o);
+  const sviTs = best.id ? sviTsByOracle[best.id] : undefined;
+  return { ...snap, oracleId: best.id, sviTsMs: sviTs ?? snap.sviTsMs };
 }
