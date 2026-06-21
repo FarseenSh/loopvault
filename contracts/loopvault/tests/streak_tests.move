@@ -55,6 +55,23 @@ fun test_touch_after_one_day_increments() {
 }
 
 #[test]
+fun test_touch_if_due_is_non_fatal_same_day() {
+    let (mut sc, mut clock) = setup(0);
+    let mut s = streak::new(OWNER, &clock, ts::ctx(&mut sc));
+    // Same-day 2nd Open: touch_if_due must NO-OP (not abort) so the trade survives.
+    clock::set_for_testing(&mut clock, DAY - 1);
+    assert!(streak::touch_if_due(&mut s, &clock) == false, 0);
+    assert!(streak::consecutive_days(&s) == 0, 1);
+    // A full day later it increments and reports it did.
+    clock::set_for_testing(&mut clock, DAY);
+    assert!(streak::touch_if_due(&mut s, &clock) == true, 2);
+    assert!(streak::consecutive_days(&s) == 1, 3);
+    unit_test::destroy(s);
+    clock::destroy_for_testing(clock);
+    ts::end(sc);
+}
+
+#[test]
 fun test_consecutive_within_window() {
     let (mut sc, mut clock) = setup(0);
     let mut s = streak::new(OWNER, &clock, ts::ctx(&mut sc));

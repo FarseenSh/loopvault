@@ -54,13 +54,27 @@ public fun create(owner: address, clock: &Clock, ctx: &mut TxContext) {
     transfer::transfer(new(owner, clock, ctx), owner);
 }
 
-/// Increment the streak. Aborts if called less than a day after the last
-/// increment. Within a 2-day window the streak is consecutive; otherwise it
-/// resets to 1.
+/// Increment the streak, aborting if called less than a day after the last
+/// increment. For the standalone Streak feature / strict callers.
 public fun touch(self: &mut Streak, clock: &Clock) {
+    assert!(try_touch(self, clock), E_TOO_SOON);
+}
+
+/// Non-aborting variant for the Open PTB: increments and returns true if a day
+/// has passed, else no-ops and returns false. This is what the Open PTB calls, so
+/// a 2nd Open the same day does NOT revert the whole hedged trade — the engagement
+/// counter must never be able to brick a trade.
+public fun touch_if_due(self: &mut Streak, clock: &Clock): bool {
+    try_touch(self, clock)
+}
+
+/// Core increment logic. Returns false (no mutation, no event) when called too
+/// soon; otherwise applies the consecutive/reset rule and emits StreakTouched.
+fun try_touch(self: &mut Streak, clock: &Clock): bool {
     let now = clock::timestamp_ms(clock);
+    if (now <= self.last_increment_ms) return false;
     let gap = now - self.last_increment_ms;
-    assert!(gap >= ONE_DAY_MS, E_TOO_SOON);
+    if (gap < ONE_DAY_MS) return false;
 
     if (gap <= 2 * ONE_DAY_MS) {
         self.consecutive_days = self.consecutive_days + 1;
@@ -79,6 +93,7 @@ public fun touch(self: &mut Streak, clock: &Clock) {
         best_streak: self.best_streak,
         at_ms: now,
     });
+    true
 }
 
 // === Accessors ===
