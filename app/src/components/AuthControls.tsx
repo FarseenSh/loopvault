@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   ConnectButton,
   useConnectWallet,
@@ -38,15 +39,7 @@ export function AuthControls() {
   const { mutate: disconnect } = useDisconnectWallet();
 
   if (account) {
-    return (
-      <span className="pill" title={account.address}>
-        <span className="dot" />
-        <span className="mono">{short(account.address)}</span>
-        <button className="linkbtn" onClick={() => disconnect()}>
-          sign out
-        </button>
-      </span>
-    );
+    return <AccountChip address={account.address} onSignOut={() => disconnect()} />;
   }
 
   const googleWallet = wallets.find((w) => isGoogleWallet(w));
@@ -66,4 +59,30 @@ export function AuthControls() {
   }
 
   return <ConnectButton />;
+}
+
+/** Connected-state chip: click the address to copy it (zkLogin users need this to
+ *  receive funds / share), plus sign-out. */
+function AccountChip({ address, onSignOut }: { address: string; onSignOut: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      await navigator.clipboard?.writeText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1400);
+    } catch {
+      /* clipboard blocked — the title tooltip still shows the full address */
+    }
+  };
+  return (
+    <span className="pill" title={`${address} — click to copy`}>
+      <span className="dot" />
+      <button className="linkbtn mono" onClick={copy} aria-label="Copy your address" style={{ cursor: "pointer" }}>
+        {copied ? "✓ copied" : short(address)}
+      </button>
+      <button className="linkbtn" onClick={onSignOut}>
+        sign out
+      </button>
+    </span>
+  );
 }
