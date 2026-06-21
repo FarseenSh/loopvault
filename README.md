@@ -105,7 +105,6 @@ app/src/hooks/             useLoopVaultSession (manager/streak), live oracle, ma
 app/src/components/        Trade / Earn / share card / vol smile / oracle gate / zkLogin
 app/src/app/api/           OG share image + LLM regime route
 app/scripts/open-live.mjs  Lands the sealed Open + the over-cap rejection on testnet
-00..03 + CLAUDE.md         Hackathon context, research, PRD, build blueprint
 ```
 
 ## Verified against the real surface (not assumed)

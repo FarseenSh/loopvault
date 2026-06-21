@@ -21,5 +21,12 @@ next-env.d.ts
 # Local Claude Code overrides (personal, not shared)
 .claude/settings.local.json
 
+# Internal planning / strategy / context docs — kept local, never published
+00-HACKATHON-CONTEXT.md
+01-RESEARCH.md
+02-PRD.md
+03-DELIVERABLE.md
+CLAUDE.md
+
 # OS / editor
 .DS_Store
