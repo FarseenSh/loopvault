@@ -72,7 +72,7 @@ export function TradePanel({
   const dusdcBal = balData ? Number(balData.totalBalance) / 10 ** CFG.dusdcDecimals : null;
 
   const c = useMemo(() => {
-    const strike = snap.forward; // ATM open
+    const strike = Math.round(snap.forward); // ATM, snapped to the protocol's $1 strike grid (oracle_config::assert_valid_strike)
     const plan = hedgeForPosition(snap.forward, strike, snap.svi, contracts, isUp ? "up" : "down");
     const cost = plan.price * contracts;
     const sizeBps = (cost / Math.max(stake, 1e-9)) * 10_000;
@@ -151,7 +151,8 @@ export function TradePanel({
       } catch (e) {
         const info = classifyTxError(e);
         setToast({ tone: info.kind === "seal" ? "ok" : "err", title: info.title, detail: info.detail });
-        emitResult(commands);
+        // Do NOT emit a position card on a revert — nothing landed, so showing a
+        // mark-to-market P&L would be misleading.
         return;
       } finally {
         setIsPending(false);

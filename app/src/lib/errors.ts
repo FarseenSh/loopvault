@@ -43,8 +43,10 @@ export function classifyTxError(e: unknown): TxErrorInfo {
     };
   }
 
-  // Predict's own protocol guards (its oracle staleness / strike checks).
+  // Predict's own protocol guards (oracle_config): code 2 = invalid strike, others = staleness.
   if (low.includes("oracle_config") || (low.includes("oracle") && low.includes("stale"))) {
+    if (abortCode(msg) === 2)
+      return { kind: "error", title: "Strike off the grid — retry", detail: "The strike wasn't on the protocol's grid (a rounding issue). Refresh the surface and tap again." };
     return { kind: "oracle", title: "Oracle moved — Open reverted", detail: "The Predict protocol's own freshness guard fired; the trade rolled back. Retry on a fresh tick." };
   }
 
