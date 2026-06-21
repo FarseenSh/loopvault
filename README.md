@@ -1,112 +1,112 @@
 # LoopVault
 
-**40,000+ people joined the DeepBook Predict consumer waitlist — with no usable interface to trade, and naked one-tap bets are dangerous.** LoopVault is the consumer terminal that makes a Predict trade *one tap, ~6 seconds, no seed phrase (zkLogin), gasless (Enoki), and risk-bounded by an atomic delta-hedge*: a single user-signed PTB atomically **opens** a Predict (vol/directional) position **and** delta-hedges it on DeepBook Spot — sealed by a no-abilities `SafeMint` hot-potato that enforces `max_loss_bps` + an `oracle_freshness_deadline`, so the trade lands fully hedged inside a fresh-oracle window **or rolls back atomically**. It is the Robinhood/Polymarket-grade front end for the only on-chain vol-surface options primitive on Sui.
+**40,000+ people joined the DeepBook Predict consumer waitlist — with no usable interface to trade, and naked one-tap bets are dangerous.** LoopVault is the consumer terminal that makes a Predict trade *one tap, ~6 seconds, no seed phrase (zkLogin), gasless (Enoki), and risk-bounded by an atomic delta-hedge*: a single user-signed PTB atomically **opens** a Predict (vol/directional) position **and** delta-hedges it on DeepBook Spot — sealed by a no-abilities `SafeMint` hot-potato that **re-derives the realized cost and the oracle's freshness on-chain** and rolls the whole trade back unless it lands inside a fresh-oracle window, within your max-loss cap. It is the Robinhood/Polymarket-grade front end for the only on-chain vol-surface options primitive on Sui.
 
 > Track: **DeepBook Predict** (Sui Overflow 2026). Judged by Aslan Tashtanov (DeepBook Lead — consumer/adoption) and Block Scholes (the SVI vol-oracle team — quant).
 >
-> **🟢 Live on Sui testnet** — `loopvault` package **`0xaf1fdf8441f3d5f0c24beb095b8de144a789f2b76f6f7ca1e6cfc7fe130e18e1`** (modules `safe_mint` · `share_card` · `streak` · `config`); publish tx [`CHjn3Ns2E2o2hhP4n6xLWbj95kv6coKPLnvz3wKHNSoE`](https://suiscan.xyz/testnet/tx/CHjn3Ns2E2o2hhP4n6xLWbj95kv6coKPLnvz3wKHNSoE).
+> **🟢 Live on Sui testnet** — `loopvault` package **`0x7e8a79d1aa42cc453969f8765f67348e46fe51b08667b84c1e109b5d7d03fcf0`** (modules `safe_mint` · `share_card` · `streak` · `config`); publish tx [`8qXSuH3b…`](https://suiscan.xyz/testnet/tx/8qXSuH3bpxEMjnQYjaSs7W512pJXX5BDWoXkXoBb6ZiG). It links against the **real** `deepbook_predict` package, so the seal calls into the live protocol.
+
+---
+
+## The safety thesis, now enforced on-chain (not by the client)
+
+The whole product rests on one claim: **you land fully hedged inside a fresh-oracle window, or you never traded at all.** `SafeMint` is a struct with **no abilities** — a true hot-potato that *must* be consumed in the same PTB or the transaction fails to type-check. Its `consume` re-asserts, entirely from **on-chain state**:
+
+- **Realized cost ≤ `max_loss_bps` of your capital.** `new` snapshots the `PredictManager` balance before the deposit and reads the deposit coin's real value; `consume` reads the balance again at the end. The only things that move the manager balance in the Open PTB are the deposit (+) and the mint (−cost), so `cost = (pre_balance + deposit) − balance_now` is *exactly* the DUSDC the mint pulled — measured, never asserted by the caller.
+- **Oracle fresh within our tighter deadline**, read from `oracle::timestamp` (the real on-chain update time), strictly tighter than the protocol's own 30s `assert_live_oracle`.
+
+> An earlier version accepted `cost_charged` / `oracle_ts` / `deposit_amount` as **caller arguments** — which made the seal a frontend attestation. This version derives all three from chain state, so the "atomic risk bound" is a property of the type system bound to real protocol state. *That is the difference between a hot-potato that looks like a guarantee and one that is one.*
+
+**Proven live on testnet — every row is a real transaction you can open in an explorer:**
+
+| Flow | On-chain result | Tx |
+|---|---|---|
+| **SafeMint-sealed atomic Open** — `new`→`deposit`→`market_key`→`mint`→`ShareCard`→`consume`, one PTB, both packages | `PositionMinted` cost **0.502695**; `SafeMintSealed` **cost_charged 502695 == the minted cost** (re-derived on-chain), oracle_age **475ms** < 20000 | [`E4dGnUgv…`](https://suiscan.xyz/testnet/tx/E4dGnUgvZBvVnvqjCp4svXyGhaxmjgg65mc8BYWbBWfd) |
+| **Seal rejects an over-cap Open** — same PTB, `max_loss_bps` too tight | **status `failure`** — `MoveAbort … safe_mint::assert_invariants, 1` (E_SIZE_EXCEEDED) **in command 6** → whole PTB reverts, deposit rolls back | [`BQqzAAbH…`](https://suiscan.xyz/testnet/tx/BQqzAAbHMv4WQfBQ2esJoA6Wk1t5VZfjvzKmjbdtgiVd) |
+| Earn `supply`→`withdraw` round-trip | DUSDC reconciles | [`9EbwuUAw…`](https://suiscan.xyz/testnet/tx/9EbwuUAwg36xSLoDDWT1JNSQGhbiSPFeT2PhUd58w9zA) |
+| DeepBook **Spot swap composes** in a PTB (zero-DEEP fee leg) | success on the whitelisted pool — resolves the #1 Spot-swap abort | [`FKGVyurv…`](https://suiscan.xyz/testnet/tx/FKGVyurvUxDJ96zHy3xSfRfJ3SXpn4TQr1UwA1Xaw89G) |
+| PredictManager (owner == the signer) | `0xd0ef…cc82c` | [`HgNgiEmB…`](https://suiscan.xyz/testnet/tx/HgNgiEmBtyzBmX3td6pD6syYyre8RFsVNRRPBsENgL77) |
+
+Row 1 **is** `buildOpenPositionPTB` (minus the Spot hedge leg — see *Hedge, honestly* below): one signature, two packages, a real SVI-priced Predict mint sealed by the no-abilities `SafeMint` enforcing freshness + `max_loss_bps` from chain state — or it all reverts (row 2). Reproduce both with `cd app && node scripts/open-live.mjs`.
 
 ---
 
 ## What's built
 
-### 1. The atomic core — *proven on the real contracts* ✅
-The whole product rests on one claim: **deposit + open is all-or-nothing**. Before any UI, we proved it on the *real* `deepbook_predict` contracts (branch `predict-testnet-4-16`) with a `test_scenario` Move suite — **no DUSDC, no faucet, no live network required**:
+### 1. The atomic core — proven on the real contracts ✅
+Before any UI, we proved deposit + open is all-or-nothing on the *real* `deepbook_predict` contracts (branch `predict-testnet-4-16`, pinned) with a `test_scenario` suite — **no DUSDC, no faucet, no live network**:
 
 | Test | Proves |
 |---|---|
-| `test_earn_supply_withdraw_roundtrip` | Earn mode: `supply` N → `withdraw` returns exactly N (clean raw-`Coin` round-trip). |
-| `test_deposit_then_mint_persists` | Success path persists: after `deposit` + `mint`, `manager.position == quantity` and the cost left the deposited balance. |
-| `test_deposit_persists_when_committed` | A *committed* deposit sticks — the counterfactual that makes the rollback proof meaningful. |
-| `test_deposit_then_stale_mint_rolls_back` | **Atomicity:** `deposit` then `mint` against a stale oracle aborts (`EOracleStale`, code 6 in `oracle_config`) → whole tx reverts → deposit rolls back. On-thesis freshness guard. |
-| `test_deposit_then_offgrid_strike_rolls_back` | **Atomicity:** second trigger — off-grid strike aborts (`EInvalidStrike`, code 2) before any cost is withdrawn → deposit rolls back. |
+| `test_earn_supply_withdraw_roundtrip` | Earn: `supply` N → `withdraw` returns exactly N. |
+| `test_deposit_then_mint_persists` | Success path persists: `manager.position == quantity`, cost left the deposit. |
+| `test_deposit_persists_when_committed` | A committed deposit sticks — the counterfactual that makes the rollback proof meaningful. |
+| `test_deposit_then_stale_mint_rolls_back` | **Atomicity:** stale oracle → `EOracleStale` (code 6, `oracle_config`) → deposit rolls back. |
+| `test_deposit_then_offgrid_strike_rolls_back` | **Atomicity:** off-grid strike → `EInvalidStrike` (code 2) before any cost is withdrawn. |
+| `test_compute_price_golden_atm_digital` | **Cross-language golden vector:** on-chain `oracle::compute_price` for fixed SVI params ∈ [0.480011, 0.480111] — the band the TS engine must reproduce. |
 
-```
-Test result: OK. Total tests: 5; passed: 5; failed: 0
-```
-The negative tests pin the **exact** abort code + location, so they cannot pass for the wrong reason — Move's per-transaction all-or-nothing semantics do the rest.
+`Move: 6/6 (predict suite) + 16/16 (loopvault unit) · TS: 21/21`. Negative tests pin the **exact** abort code + location, so they can't pass for the wrong reason.
 
-### 2. The `SafeMint` seal — our safety thesis in Move
-`contracts/loopvault/` ships the hot-potato that makes one-tap safe:
-- **`safe_mint`** — a struct with **no abilities** (a true hot-potato: it *must* be consumed in the same PTB). `consume()` asserts the oracle is fresh within our *tighter* `oracle_freshness_deadline` (≤ the protocol's 30s) **and** that the cost charged ≤ `max_loss_bps` of the capital base. Can't be dropped, can't be stored — the trade either seals cleanly or the PTB aborts.
-- **`share_card`** (consumer flex / position receipt), **`streak`** (daily-engagement object), and **`config`** (the mainnet toggle). Each module has its own unit tests.
+### 2. A *genuine* SVI delta hedge — verified against the chain, not assumed
+`app/src/lib/{svi,delta}.ts` reads the **real** SVI surface and computes a real digital forward-delta — not a 1:1 dummy. A Predict UP position is a cash-or-nothing digital priced `N(d2)`, `d2 = −((k + w/2)/√w)`, `k = ln(K/F)`, `w` the SVI total variance — *exactly* `deepbook_predict::oracle::compute_nd2`. The hedge is its forward delta, and because `w = w(k)`, the derivative carries the **smile slope** `dw/dk`. Validated three ways:
+- **Finite-difference** bump (`delta.test.ts`) — and the test proves the naive flat-vol delta is measurably *wrong*.
+- **Cross-language golden vector** — the same SVI params run through the on-chain `compute_price` (Move test) and the TS `binaryUpPrice` agree to <1e-4 (closing the language boundary, not asserting it).
+- **Against live testnet** — `liveOracle.test.ts` bakes in a real `OracleSVIUpdated` event + `OracleSVI` object and asserts the decoder reproduces it (forward $62,628, `rho = −0.940`, signed `i64`).
 
-**Proven live on testnet — every row below is a real transaction you can open in an explorer.** DUSDC is funded; the deposit→mint→seal flow runs end-to-end (only the Spot hedge leg awaits Gate-3 ids):
-
-| Flow | On-chain result | Tx |
-|---|---|---|
-| **SafeMint-sealed atomic Open** — `new`→`deposit`→`mint`→`consume`, one PTB, **both packages** | `PositionMinted` ask `0.5109`, then `SafeMintSealed` `oracle_age_ms 4621` < 30000 | [`9HbKgW28…`](https://suiscan.xyz/testnet/tx/9HbKgW28iRsGcFzKq33jx8i5oteUd3VXLmiUvoJfaaUx) |
-| Atomic `deposit`+`mint` (Open core) | `PositionMinted`, ask `0.5939`, cost 0.594 DUSDC, strike $63,894 | [`7AdsroJm…`](https://suiscan.xyz/testnet/tx/7AdsroJm2Q6J8dkDuvxsGA4ugWqhvPDx2ZgXQv4vrrcg) |
-| Earn `supply`→`withdraw` round-trip | DUSDC reconciles (−0.000001 dust) | [`9EbwuUAw…`](https://suiscan.xyz/testnet/tx/9EbwuUAwg36xSLoDDWT1JNSQGhbiSPFeT2PhUd58w9zA) |
-| SafeMint seal **rejects** an over-cap cost | aborts `E_SIZE_EXCEEDED` (code 1) → whole PTB reverts | [`E2uWkrf2…`](https://suiscan.xyz/testnet/tx/E2uWkrf219sBhsXsf24znK2kyJMSL8wkNfBtFdGHzcLw) |
-| SafeMint seal **consumes** when fresh + within cap | `SafeMintSealed`, age 12.0s < 20s | [`357Gu5tL…`](https://suiscan.xyz/testnet/tx/357Gu5tL1Sdc7GcqJv8kTHnhgjwrhmU5w7aRh62pZkij) |
-| ShareCard NFT minted | object `0x7d6a…34d96` | [`Cqnbd3Hs…`](https://suiscan.xyz/testnet/tx/Cqnbd3HsAmad6y1g66f2crjYzbJfcfY6Bh5bo6iB32j9) |
-| PredictManager provisioned | `0xd0ef…cc82c` | [`HgNgiEmB…`](https://suiscan.xyz/testnet/tx/HgNgiEmBtyzBmX3td6pD6syYyre8RFsVNRRPBsENgL77) |
-| DeepBook **Spot swap composes** in a PTB (zero-DEEP fee leg) | success on the whitelisted DEEP/SUI pool — resolves the #1 Spot-swap abort | [`FKGVyurv…`](https://suiscan.xyz/testnet/tx/FKGVyurvUxDJ96zHy3xSfRfJ3SXpn4TQr1UwA1Xaw89G) |
-
-Row 1 **is** `buildOpenPositionPTB` minus the Spot hedge: one signature, two packages, a real SVI-priced Predict mint sealed by the no-abilities SafeMint enforcing freshness + `max_loss_bps` — or it all reverts. The safety thesis, verified on-chain, not just in unit tests.
-
-### 3. A *genuine* SVI delta hedge — what the Block Scholes judge checks
-`app/src/lib/{svi,delta}.ts` reads the **real** SVI surface and computes a real digital forward-delta — not a 1:1 dummy. A Predict UP position is a cash-or-nothing digital priced `N(d2)`, `d2 = -((k + w/2)/√w)`, `k = ln(K/F)`, `w` the SVI total variance — *exactly* `deepbook_predict::oracle::compute_nd2`. The hedge is its forward delta, and because `w = w(k)`, the derivative carries the **smile slope** `dw/dk`. Validated against a finite-difference bump in `delta.test.ts` (which also shows the naive flat-vol delta is measurably wrong).
-
-### 4. The single-signature Open PTB
+### 3. The single-signature Open PTB
 `app/src/ptb/buildOpenPositionPTB.ts` assembles the centerpiece, in order:
-`safe_mint::new` → `predict_manager::deposit` → `market_key::new` → `predict::mint` → **DeepBook Spot delta-hedge swap** (buy/sell/none, real 3-tuple sig with the zero-DEEP fee leg) → `share_card::mint_to` → `streak::touch` → `safe_mint::consume`. The signer **is** the PredictManager owner (their zkLogin address), so the `sender == owner` checks pass natively — no third-party router. Earn's `supply`/`withdraw` round-trip is `buildEarnSupplyPTB` / `buildWithdrawPTB`.
+`safe_mint::new` → `predict_manager::deposit` → `market_key::new` → `predict::mint` → **DeepBook Spot delta-hedge** (buy/sell/none, real 3-tuple sig + zero-DEEP fee leg) → `share_card::mint_to` → `streak::touch_if_due` → `safe_mint::consume`. The signer **is** the PredictManager owner, so the `sender == owner` gates pass natively — no third-party router.
 
-### 5. The consumer dApp (Next.js 16 / React 19)
-`app/` — a dark, game-feel trading terminal that's fully alive on a synthesized demo surface (no indexer/DUSDC needed to demo):
-- **One-tap Trade** — Call/Put, size, a live max-loss-cap slider tied to the `SafeMint` guard; tapping builds the *real* Open PTB and (when ids resolve) signs it, else surfaces the sealed command count.
-- **Live mark-to-market share card** — re-prices **both legs** every tick (digital vs. the SVI surface, hedge vs. the forward) so the net P&L visibly shows the hedge offsetting the directional move.
-- **Block Scholes vol smile** (SVG), an **oracle-freshness countdown** that grays out Open past the 20s deadline, and a "freeze oracle" toggle that demonstrates the gate locking on stale data.
-- **Demo ↔ Live testnet toggle** — flip to render the *real* on-chain BTC SVI surface, decoded client-side from read-only RPC (`fetchBtcOracleSnapshot`); the freshness gate then follows the real oracle timestamp.
-- `pnpm build` is green (static prerender), `tsc` clean, 16/16 unit tests pass.
+### 4. The consumer dApp (Next.js 16 / React 19) — the Open actually executes
+`app/` — a dark, game-feel terminal that **submits the real Open on testnet**:
+- **zkLogin onboarding** (`useLoopVaultSession`) — on connect we discover the user's `PredictManager` (cache → chain-event recovery), and if absent, one gasless onboarding tx (`predict::create_manager` + `streak::create`) creates it owned by their zkLogin address. The linchpin that makes the owner-gates pass.
+- **One-tap Trade** — Call/Put, stake/contracts, a live max-loss-cap slider tied to the `SafeMint` guard; tapping against the **live oracle** signs + submits the real Open. An over-cap tap submits anyway and lets the seal reject it — the demo's killer beat, on-chain.
+- **Honest oracle freshness** — the gate watches the **price feed** (~1s, the only clock the protocol/seal can enforce) *and* separately surfaces the **SVI surface age** (`update_svi` never bumps `oracle.timestamp`), so you always know how fresh the smile your delta uses is.
+- **Honest errors** — a real `safe_mint` abort reads as "the seal held"; a wallet rejection or RPC error does not (`lib/errors.ts`).
+- **Earn** — `supply` → **and Withdraw** round-trip, both live.
+- **Social** — provenance-checked `ShareCard` NFT (only mintable for a position your manager actually holds), an OG-image route (`/api/card/[id]`), a copy-trade deep link, and a real **LLM** vol-regime line (`/api/regime`, Claude) with a deterministic fallback honestly labeled `SURFACE` vs `AI`.
+- **Demo ↔ Live testnet toggle**, Block Scholes vol smile (SVG), oracle countdown, mobile-first PWA. `pnpm build` green, `tsc` clean, **21/21** unit tests pass.
 
-### 6. zkLogin + gasless — *no seed phrase*
-`app/src/components/{RegisterEnokiWallets,AuthControls}.tsx` register Enoki zkLogin wallets into the wallet-standard registry via `registerEnokiWallets`, so **"Continue with Google"** appears in the normal connect flow and Enoki sponsors gas. It's **env-gated**: with no keys the app cleanly falls back to wallet-extension connect; the Trade/Earn panels are unchanged because they already sign through dapp-kit. Set keys in `.env.local` (see `.env.example`).
+### 5. zkLogin + gasless — no seed phrase
+`RegisterEnokiWallets`/`AuthControls` register Enoki zkLogin (Google) into the wallet-standard registry, so **"Continue with Google"** appears in the normal connect flow and Enoki sponsors gas. Env-gated: with no keys the app cleanly falls back to wallet-extension connect (`app/.env.example`).
 
 ---
 
+## Hedge, honestly (testnet vs mainnet)
+The Open PTB composes the Predict mint **and** the DeepBook Spot hedge in one signature (the builder + `ptb.test.ts` pin the exact command order; the Spot swap is proven composing in a PTB, tx `FKGVyurv…`). On **testnet**, Predict quotes in its own **DUSDC** while DeepBook Spot quotes in **DBUSDC** — *different* stablecoins — so a single-coin hedged Open isn't possible without also holding DBUSDC. The proven live Open is therefore `deposit → mint → seal` (hedge toggle off), and the single-tap, one-balance hedged Open is a **mainnet-day-1 unlock** (`hedgeQuoteType === dusdcType ===` the canonical USDC), flipped by config with zero code change. The genuine SVI delta that *sizes* the hedge (with correct per-coin decimals + a slippage guard) is exact and golden-vector-tested today.
+
 ## Run it
 ```bash
-# Move atomicity proof (no DUSDC / network beyond a one-time clone)
-brew install sui                 # Sui CLI (Move 2024)
-./scripts/run-predict-tests.sh   # clones the pinned predict pkg, runs the suite
-./scripts/run-predict-tests.sh loopvault   # just LoopVault's tests
+# Move proofs (clones the pinned predict pkg into ./external, gitignored)
+brew install sui
+./scripts/run-predict-tests.sh                 # atomicity + golden vector on the REAL predict pkg
+cd contracts/loopvault && sui move test         # SafeMint / ShareCard / Streak units (16/16)
+
+# Land the sealed Open + the over-cap rejection live (uses the project's isolated key)
+cd app && node scripts/open-live.mjs
 
 # The dApp
-cd app
-pnpm install
-cp .env.example .env.local       # optional: add Enoki + Google keys for zkLogin
-pnpm dev                         # http://localhost:3000  (demo surface, fully alive)
-pnpm build && pnpm test          # green build + 13 unit tests
+cd app && pnpm install
+cp .env.example .env.local                       # optional: Enoki + Google (zkLogin), ANTHROPIC_API_KEY (AI line)
+pnpm dev                                          # http://localhost:3000
+pnpm build && pnpm test                           # green build + 21 tests
 ```
 
 ## Config-only mainnet toggle (the 50/50 prize path)
-Predict is testnet-only today. Every on-chain id lives in **one** module — `app/src/config/loopvault.config.ts` — with `TESTNET`/`MAINNET` records and an `assertResolved()` guard. The day Predict ships mainnet, we fill the `MAINNET` ids and flip `NEXT_PUBLIC_NETWORK`; no PTB builder or component holds a literal id. That unlocks the mainnet half of the score on day one.
+Every on-chain id lives in **one** module — `app/src/config/loopvault.config.ts` — with `TESTNET`/`MAINNET` records and an `assertResolved()` guard. The day Predict ships mainnet we fill the `MAINNET` ids and flip `NEXT_PUBLIC_NETWORK`; no PTB builder or component holds a literal id, and one canonical USDC funds both the position and its hedge.
 
 ## Repo layout
 ```
-contracts/loopvault/       SafeMint hot-potato seal + ShareCard + Streak + config (our Move pkg)
-contracts/predict-tests/   Atomicity + Earn tests, and a 6-dp test quote coin (our work)
-app/src/ptb/               The single-sig Open PTB + Earn supply/withdraw builders
-app/src/lib/               SVI surface + genuine digital delta engine (+ tests)
-app/src/components/         Trade / Earn / share card / vol smile / oracle gate / zkLogin
-app/src/config/            Single source of every on-chain id; testnet↔mainnet toggle
-scripts/sui-local.sh       Sui CLI pinned to this project's ISOLATED config (./.sui), never global
-scripts/run-predict-tests.sh   Pinned-clone + copy-tests + `sui move test` runner
-external/                  (gitignored) pinned MystenLabs/deepbookv3 clone — attributed dependency
-00..03 + CLAUDE.md         Hackathon context, research, PRD, and the build blueprint
+contracts/loopvault/       SafeMint seal (binds cost+oracle on-chain) + ShareCard + Streak + config
+contracts/predict-tests/   Atomicity + golden-vector tests against the real predict pkg
+app/src/ptb/               Open PTB + onboarding + Earn supply/withdraw builders
+app/src/lib/               SVI surface + genuine digital delta + session + errors + copy-trade
+app/src/hooks/             useLoopVaultSession (manager/streak), live oracle, market feed
+app/src/components/        Trade / Earn / share card / vol smile / oracle gate / zkLogin
+app/src/app/api/           OG share image + LLM regime route
+app/scripts/open-live.mjs  Lands the sealed Open + the over-cap rejection on testnet
+00..03 + CLAUDE.md         Hackathon context, research, PRD, build blueprint
 ```
 
-## What's next
-- ✅ **Published `loopvault` to testnet** (package id above); `safe_mint`/`share_card`/`streak` live on-chain.
-- ✅ **Gate 1b proven live** — Earn `supply`→`withdraw`, atomic `deposit`+`mint`, and the full **SafeMint-sealed atomic Open** all run on testnet (table above). DUSDC type resolved in the config.
-- ✅ **Gate 3 wired & verified:** DeepBook Spot ids resolved in the config (current pkg `0x22be…a3c`, the **DBTC/DBUSDC** pool — the BTC hedge pair, DEEP, DBTC); the swap signature matches source and the **swap composes live in a PTB with a zero-DEEP fee leg** ([`FKGVyurv…`](https://suiscan.xyz/testnet/tx/FKGVyurvUxDJ96zHy3xSfRfJ3SXpn4TQr1UwA1Xaw89G)). The off-chain SVI delta is exact and the Open PTB is wired for the swap (`hedgeQuoteType`).
-  - **Testnet reality:** Predict quotes in its own DUSDC while DeepBook Spot quotes in DBUSDC — *different* stablecoins — so a position and its hedge can't share one coin on testnet. The full single-tx hedged Open is a **mainnet-day-1 unlock**, where `hedgeQuoteType === dusdcType ===` the canonical USDC and one balance funds both legs (config toggle, zero code change).
-
 ## Verified against the real surface (not assumed)
-The SVI event `OracleSVIUpdated` encodes `a:u64, b:u64, rho:i64::I64, m:i64::I64, sigma:u64` (all ×`FLOAT_SCALING`=1e9), where `i64::I64 = { magnitude:u64, is_negative:bool }` — `rho`/`m` are **signed**, decoded field-by-field in `app/src/lib/i64.ts` or the surface silently corrupts.
-
-This is **verified, not assumed**, two ways:
-1. **Against source:** the pricing in `app/src/lib/{svi,delta}.ts` matches `deepbook_predict::oracle::compute_nd2` (`oracle.move:397-428`) line-for-line — `k = ln(K/F)`, `w(k) = a + b·(rho·(k−m) + √((k−m)²+σ²))`, `d2 = −((k+w/2)/√w)`, UP = `N(d2)`, DOWN = `1−UP`.
-2. **Against live testnet:** `app/src/lib/liveOracle.test.ts` bakes in **real** `OracleSVIUpdated` events and a real BTC `OracleSVI` object pulled from `fullnode.testnet.sui.io` (forward **$62,628**, spot $62,627, `rho = −0.940`, ~**39%** ATM IV) and asserts our decoder reproduces them — so "we read the real surface" is a passing test. It's **wired into the app** as a Demo ↔ Live testnet toggle and validated end-to-end against testnet (live BTC forward ~$63k, ~37% ATM IV, oracle age <1s → the Open gate is green on real data).
+The SVI event `OracleSVIUpdated` encodes `a:u64, b:u64, rho:i64::I64, m:i64::I64, sigma:u64` (all ×`FLOAT_SCALING`=1e9), where `i64::I64 = { magnitude:u64, is_negative:bool }` — `rho`/`m` are **signed**, decoded field-by-field in `app/src/lib/i64.ts` or the surface silently corrupts. Verified against `oracle.move:397-428` line-for-line **and** against live testnet data — both as passing tests.
