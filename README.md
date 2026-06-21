@@ -31,15 +31,19 @@ The negative tests pin the **exact** abort code + location, so they cannot pass 
 - **`safe_mint`** — a struct with **no abilities** (a true hot-potato: it *must* be consumed in the same PTB). `consume()` asserts the oracle is fresh within our *tighter* `oracle_freshness_deadline` (≤ the protocol's 30s) **and** that the cost charged ≤ `max_loss_bps` of the capital base. Can't be dropped, can't be stored — the trade either seals cleanly or the PTB aborts.
 - **`share_card`** (consumer flex / position receipt), **`streak`** (daily-engagement object), and **`config`** (the mainnet toggle). Each module has its own unit tests.
 
-**Proven live on the deployed package (testnet, gas-only — no DUSDC):**
+**Proven live on testnet — every row below is a real transaction you can open in an explorer.** DUSDC is funded; the deposit→mint→seal flow runs end-to-end (only the Spot hedge leg awaits Gate-3 ids):
 
-| What | Result | Tx |
+| Flow | On-chain result | Tx |
 |---|---|---|
-| SafeMint seal **consumes** (fresh + within cap) | `SafeMintSealed` emitted, `oracle_age_ms 12011` < 20000 | [`357Gu5tL…`](https://suiscan.xyz/testnet/tx/357Gu5tL1Sdc7GcqJv8kTHnhgjwrhmU5w7aRh62pZkij) |
+| **SafeMint-sealed atomic Open** — `new`→`deposit`→`mint`→`consume`, one PTB, **both packages** | `PositionMinted` ask `0.5109`, then `SafeMintSealed` `oracle_age_ms 4621` < 30000 | [`9HbKgW28…`](https://suiscan.xyz/testnet/tx/9HbKgW28iRsGcFzKq33jx8i5oteUd3VXLmiUvoJfaaUx) |
+| Atomic `deposit`+`mint` (Open core) | `PositionMinted`, ask `0.5939`, cost 0.594 DUSDC, strike $63,894 | [`7AdsroJm…`](https://suiscan.xyz/testnet/tx/7AdsroJm2Q6J8dkDuvxsGA4ugWqhvPDx2ZgXQv4vrrcg) |
+| Earn `supply`→`withdraw` round-trip | DUSDC reconciles (−0.000001 dust) | [`9EbwuUAw…`](https://suiscan.xyz/testnet/tx/9EbwuUAwg36xSLoDDWT1JNSQGhbiSPFeT2PhUd58w9zA) |
 | SafeMint seal **rejects** an over-cap cost | aborts `E_SIZE_EXCEEDED` (code 1) → whole PTB reverts | [`E2uWkrf2…`](https://suiscan.xyz/testnet/tx/E2uWkrf219sBhsXsf24znK2kyJMSL8wkNfBtFdGHzcLw) |
-| ShareCard NFT minted to the user | object `0x7d6a…34d96` | [`Cqnbd3Hs…`](https://suiscan.xyz/testnet/tx/Cqnbd3HsAmad6y1g66f2crjYzbJfcfY6Bh5bo6iB32j9) |
+| SafeMint seal **consumes** when fresh + within cap | `SafeMintSealed`, age 12.0s < 20s | [`357Gu5tL…`](https://suiscan.xyz/testnet/tx/357Gu5tL1Sdc7GcqJv8kTHnhgjwrhmU5w7aRh62pZkij) |
+| ShareCard NFT minted | object `0x7d6a…34d96` | [`Cqnbd3Hs…`](https://suiscan.xyz/testnet/tx/Cqnbd3HsAmad6y1g66f2crjYzbJfcfY6Bh5bo6iB32j9) |
+| PredictManager provisioned | `0xd0ef…cc82c` | [`HgNgiEmB…`](https://suiscan.xyz/testnet/tx/HgNgiEmBtyzBmX3td6pD6syYyre8RFsVNRRPBsENgL77) |
 
-So the seal's guarantee — *fresh-oracle window + `max_loss_bps` cap, or atomic revert* — is verified on-chain on the live package, not just in unit tests.
+Row 1 **is** `buildOpenPositionPTB` minus the Spot hedge: one signature, two packages, a real SVI-priced Predict mint sealed by the no-abilities SafeMint enforcing freshness + `max_loss_bps` — or it all reverts. The safety thesis, verified on-chain, not just in unit tests.
 
 ### 3. A *genuine* SVI delta hedge — what the Block Scholes judge checks
 `app/src/lib/{svi,delta}.ts` reads the **real** SVI surface and computes a real digital forward-delta — not a 1:1 dummy. A Predict UP position is a cash-or-nothing digital priced `N(d2)`, `d2 = -((k + w/2)/√w)`, `k = ln(K/F)`, `w` the SVI total variance — *exactly* `deepbook_predict::oracle::compute_nd2`. The hedge is its forward delta, and because `w = w(k)`, the derivative carries the **smile slope** `dw/dk`. Validated against a finite-difference bump in `delta.test.ts` (which also shows the naive flat-vol delta is measurably wrong).
@@ -94,10 +98,9 @@ external/                  (gitignored) pinned MystenLabs/deepbookv3 clone — a
 ```
 
 ## What's next
-- ✅ **Published `loopvault` to testnet** (package id above); `safe_mint`/`share_card`/`streak` are live, and the **SafeMint seal is verified on-chain** (table above).
-- ✅ **`PredictManager` provisioned** for the test address (`0xd0ef…cc82c`, tx [`HgNgiEmB…`](https://suiscan.xyz/testnet/tx/HgNgiEmBtyzBmX3td6pD6syYyre8RFsVNRRPBsENgL77)) — ready to deposit into.
-- **Gate 1b (live deposit+mint):** needs DUSDC in `0x71a7…b690` → then `supply`/`withdraw` + `deposit`+`mint` run as real PTBs, tx hashes linked here.
-- **Resolve remaining ids** for the hedge leg: the DUSDC coin type + a zero-DEEP / whitelisted Spot pool + base. One line each in the config; `assertResolved()` blocks placeholder ships.
+- ✅ **Published `loopvault` to testnet** (package id above); `safe_mint`/`share_card`/`streak` live on-chain.
+- ✅ **Gate 1b proven live** — Earn `supply`→`withdraw`, atomic `deposit`+`mint`, and the full **SafeMint-sealed atomic Open** all run on testnet (table above). DUSDC type resolved in the config.
+- **Spot delta-hedge leg (Gate 3):** resolve a zero-DEEP / whitelisted DeepBook Spot pool + base + DEEP type, then the Open PTB hedges in the same transaction. The off-chain delta is already SVI-exact; only the on-chain swap ids remain.
 
 ## Verified against the real surface (not assumed)
 The SVI event `OracleSVIUpdated` encodes `a:u64, b:u64, rho:i64::I64, m:i64::I64, sigma:u64` (all ×`FLOAT_SCALING`=1e9), where `i64::I64 = { magnitude:u64, is_negative:bool }` — `rho`/`m` are **signed**, decoded field-by-field in `app/src/lib/i64.ts` or the surface silently corrupts.
