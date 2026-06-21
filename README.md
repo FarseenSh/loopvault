@@ -42,6 +42,7 @@ The negative tests pin the **exact** abort code + location, so they cannot pass 
 | SafeMint seal **consumes** when fresh + within cap | `SafeMintSealed`, age 12.0s < 20s | [`357Gu5tL…`](https://suiscan.xyz/testnet/tx/357Gu5tL1Sdc7GcqJv8kTHnhgjwrhmU5w7aRh62pZkij) |
 | ShareCard NFT minted | object `0x7d6a…34d96` | [`Cqnbd3Hs…`](https://suiscan.xyz/testnet/tx/Cqnbd3HsAmad6y1g66f2crjYzbJfcfY6Bh5bo6iB32j9) |
 | PredictManager provisioned | `0xd0ef…cc82c` | [`HgNgiEmB…`](https://suiscan.xyz/testnet/tx/HgNgiEmBtyzBmX3td6pD6syYyre8RFsVNRRPBsENgL77) |
+| DeepBook **Spot swap composes** in a PTB (zero-DEEP fee leg) | success on the whitelisted DEEP/SUI pool — resolves the #1 Spot-swap abort | [`FKGVyurv…`](https://suiscan.xyz/testnet/tx/FKGVyurvUxDJ96zHy3xSfRfJ3SXpn4TQr1UwA1Xaw89G) |
 
 Row 1 **is** `buildOpenPositionPTB` minus the Spot hedge: one signature, two packages, a real SVI-priced Predict mint sealed by the no-abilities SafeMint enforcing freshness + `max_loss_bps` — or it all reverts. The safety thesis, verified on-chain, not just in unit tests.
 
@@ -100,7 +101,8 @@ external/                  (gitignored) pinned MystenLabs/deepbookv3 clone — a
 ## What's next
 - ✅ **Published `loopvault` to testnet** (package id above); `safe_mint`/`share_card`/`streak` live on-chain.
 - ✅ **Gate 1b proven live** — Earn `supply`→`withdraw`, atomic `deposit`+`mint`, and the full **SafeMint-sealed atomic Open** all run on testnet (table above). DUSDC type resolved in the config.
-- **Spot delta-hedge leg (Gate 3):** resolve a zero-DEEP / whitelisted DeepBook Spot pool + base + DEEP type, then the Open PTB hedges in the same transaction. The off-chain delta is already SVI-exact; only the on-chain swap ids remain.
+- ✅ **Gate 3 wired & verified:** DeepBook Spot ids resolved in the config (current pkg `0x22be…a3c`, the **DBTC/DBUSDC** pool — the BTC hedge pair, DEEP, DBTC); the swap signature matches source and the **swap composes live in a PTB with a zero-DEEP fee leg** ([`FKGVyurv…`](https://suiscan.xyz/testnet/tx/FKGVyurvUxDJ96zHy3xSfRfJ3SXpn4TQr1UwA1Xaw89G)). The off-chain SVI delta is exact and the Open PTB is wired for the swap (`hedgeQuoteType`).
+  - **Testnet reality:** Predict quotes in its own DUSDC while DeepBook Spot quotes in DBUSDC — *different* stablecoins — so a position and its hedge can't share one coin on testnet. The full single-tx hedged Open is a **mainnet-day-1 unlock**, where `hedgeQuoteType === dusdcType ===` the canonical USDC and one balance funds both legs (config toggle, zero code change).
 
 ## Verified against the real surface (not assumed)
 The SVI event `OracleSVIUpdated` encodes `a:u64, b:u64, rho:i64::I64, m:i64::I64, sigma:u64` (all ×`FLOAT_SCALING`=1e9), where `i64::I64 = { magnitude:u64, is_negative:bool }` — `rho`/`m` are **signed**, decoded field-by-field in `app/src/lib/i64.ts` or the surface silently corrupts.

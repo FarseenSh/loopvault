@@ -16,6 +16,7 @@ const cfg: LoopVaultConfig = {
   spotPoolId: "0xf7",
   deepType: "0xa8::deep::DEEP",
   hedgeBaseType: "0xb9::wbtc::WBTC",
+  hedgeQuoteType: "0xd5::dusdc::DUSDC",
   loopvaultPkg: "0xca",
 };
 

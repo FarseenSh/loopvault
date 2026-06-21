@@ -85,10 +85,10 @@ export function buildOpenPositionPTB(a: OpenPositionArgs, cfg: LoopVaultConfig =
       hedge.side === "buy_base"
         ? tx.moveCall({
             target: `${cfg.deepbookPkg}::pool::swap_exact_quote_for_base`,
-            typeArguments: [cfg.hedgeBaseType, cfg.dusdcType],
+            typeArguments: [cfg.hedgeBaseType, cfg.hedgeQuoteType],
             arguments: [
               pool,
-              coinWithBalance({ balance: hedge.quoteIn, type: cfg.dusdcType }),
+              coinWithBalance({ balance: hedge.quoteIn, type: cfg.hedgeQuoteType }),
               deepIn,
               tx.pure.u64(hedge.minBaseOut),
               clock,
@@ -96,7 +96,7 @@ export function buildOpenPositionPTB(a: OpenPositionArgs, cfg: LoopVaultConfig =
           })
         : tx.moveCall({
             target: `${cfg.deepbookPkg}::pool::swap_exact_base_for_quote`,
-            typeArguments: [cfg.hedgeBaseType, cfg.dusdcType],
+            typeArguments: [cfg.hedgeBaseType, cfg.hedgeQuoteType],
             arguments: [
               pool,
               coinWithBalance({ balance: hedge.baseIn, type: cfg.hedgeBaseType }),

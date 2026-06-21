@@ -22,8 +22,11 @@ export interface LoopVaultConfig {
   spotPoolId: string;
   /** full DEEP coin type */
   deepType: string;
-  /** the hedge base coin type (e.g. wBTC) */
+  /** the hedge base coin type (e.g. DBTC / wBTC) */
   hedgeBaseType: string;
+  /** the Spot pool's QUOTE coin type. On testnet this is DeepBook's DBUSDC, which
+   *  DIFFERS from the Predict DUSDC; on mainnet both are the same canonical USDC. */
+  hedgeQuoteType: string;
   /** our published loopvault package id */
   loopvaultPkg: string;
 }
@@ -42,10 +45,11 @@ export const TESTNET: LoopVaultConfig = {
   predictRegistry: "0x43af14fed5480c20ff77e2263d5f794c35b9fab7e2212903127062f4fe2a6e64",
   oracleSviId: PLACEHOLDER, // Gate 4: discover from the indexer / object query
   dusdcType: "0xe95040085976bfd54a1a07225cd46c8a2b4e8e2b6732f140a0fc49850ba73e1a::dusdc::DUSDC", // Gate 0: confirmed from faucet (6dp)
-  deepbookPkg: PLACEHOLDER, // Gate 3: DeepBook Spot pkg on testnet
-  spotPoolId: PLACEHOLDER, // Gate 3: a zero-DEEP / whitelisted stablecoin pool
-  deepType: TODO_TYPE, // Gate 3
-  hedgeBaseType: TODO_TYPE, // Gate 3
+  deepbookPkg: "0x22be4cade64bf2d02412c7e8d0e8beea2f78828b948118d46735315409371a3c", // Gate 3: current DeepBook Spot pkg (testnet)
+  spotPoolId: "0x0dce0aa771074eb83d1f4a29d48be8248d4d2190976a5241f66b43ec18fa34de", // Gate 3: DBTC/DBUSDC Spot pool (the BTC hedge pair)
+  deepType: "0x36dbef866a1d62bf7328989a10fb2f07d769f4ee587c0de4a0a256e57e0a58a8::deep::DEEP", // Gate 3
+  hedgeBaseType: "0x6502dae813dbe5e42643c119a6450a518481f03063febc7e20238e43b6ea9e86::dbtc::DBTC", // Gate 3: DBTC (BTC base)
+  hedgeQuoteType: "0xf7152c05930480cd740d7311b5b8b45c6f488e3a53a11c3f74a6fac36a52e0d7::DBUSDC::DBUSDC", // Gate 3: Spot quote (DBUSDC; != predict DUSDC on testnet)
   loopvaultPkg: "0xaf1fdf8441f3d5f0c24beb095b8de144a789f2b76f6f7ca1e6cfc7fe130e18e1", // Gate 5: PUBLISHED to testnet (tx CHjn3Ns2E2o2hhP4n6xLWbj95kv6coKPLnvz3wKHNSoE)
 };
 
@@ -53,7 +57,8 @@ export const TESTNET: LoopVaultConfig = {
 export const MAINNET: LoopVaultConfig = {
   ...TESTNET,
   network: "mainnet",
-  // predictPkg / predictSharedObj / predictRegistry / oracleSviId / dusdcType -> Predict mainnet day-1
+  // predictPkg / predictSharedObj / predictRegistry / oracleSviId / dusdcType -> Predict mainnet day-1.
+  // On mainnet hedgeQuoteType === dusdcType === the canonical USDC, so one stablecoin funds both legs.
 };
 
 export const NETWORK: Network =
