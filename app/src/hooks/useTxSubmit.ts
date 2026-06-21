@@ -59,6 +59,16 @@ export function useTxSubmit(): (tx: Transaction) => Promise<{ digest: string }> 
             sender: address,
           });
         } catch (err) {
+          // Create failed. Usually the tx would abort on-chain (e.g. the SafeMint seal
+          // rejecting an over-cap Open) — Enoki won't sponsor a failing tx and returns a
+          // generic error, so diagnose precisely with a dry-run and surface the real
+          // MoveAbort (lets classifyTxError show "the seal held", not a generic failure).
+          const dry = await client
+            .devInspectTransactionBlock({ sender: address, transactionBlock: tx })
+            .catch(() => null);
+          const abortErr = dry?.effects?.status?.error;
+          if (abortErr) throw new Error(abortErr);
+          // No abort → genuine sponsorship outage → fall back to user-paid signing.
           console.warn("[loopvault] sponsorship unavailable, paying gas instead:", err);
           const res = await signAndExecute({ transaction: tx });
           return { digest: res.digest };
