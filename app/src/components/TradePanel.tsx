@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useSignAndExecuteTransaction } from "@mysten/dapp-kit";
 import { hedgeForPosition } from "../lib/delta";
+import { useTxSubmit } from "../hooks/useTxSubmit";
 import { classifyTxError } from "../lib/errors";
 import { fmtNum, fmtPct, fmtUsd, type MarketSnapshot } from "../lib/market";
 import { buildOpenPositionPTB, type HedgeLeg } from "../ptb/buildOpenPositionPTB";
@@ -55,7 +55,8 @@ export function TradePanel({
   const [stake, setStake] = useState(50); // DUSDC committed (deposit) == max-loss denominator
   const [maxLossBps, setMaxLossBps] = useState(1500);
   const [hedgeOn, setHedgeOn] = useState(false); // testnet: DUSDC != DBUSDC, so default off
-  const { mutateAsync, isPending } = useSignAndExecuteTransaction();
+  const submit = useTxSubmit();
+  const [isPending, setIsPending] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
 
   const account = !!session.address;
@@ -131,9 +132,10 @@ export function TradePanel({
 
     // Submit live only against a REAL on-chain oracle + a ready session.
     if (account && session.status === "ready" && liveOracle) {
-      setToast({ tone: "info", title: "Opening…", detail: "Sign once — deposit → mint → seal, atomic." });
+      setToast({ tone: "info", title: "Opening…", detail: "Sign once — gasless, deposit → mint → seal, atomic." });
+      setIsPending(true);
       try {
-        const res = await mutateAsync({ transaction: tx });
+        const res = await submit(tx);
         setToast({ tone: "ok", title: "Opened — fully sealed on-chain", detail: `Digest ${res.digest.slice(0, 10)}… · SafeMint consumed.` });
         emitResult(commands, res.digest);
         return;
@@ -142,6 +144,8 @@ export function TradePanel({
         setToast({ tone: info.kind === "seal" ? "ok" : "err", title: info.title, detail: info.detail });
         emitResult(commands);
         return;
+      } finally {
+        setIsPending(false);
       }
     }
 

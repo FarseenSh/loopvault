@@ -5,7 +5,8 @@
 // Onboarding is one gasless (Enoki) tx: create_manager + streak::create.
 
 import { useCallback, useEffect, useState } from "react";
-import { useCurrentAccount, useSignAndExecuteTransaction, useSuiClient } from "@mysten/dapp-kit";
+import { useCurrentAccount, useSuiClient } from "@mysten/dapp-kit";
+import { useTxSubmit } from "./useTxSubmit";
 import { CFG } from "../config/loopvault.config";
 import { buildOnboardingPTB } from "../ptb/buildOnboardingPTB";
 import {
@@ -37,7 +38,7 @@ export interface LoopVaultSession {
 export function useLoopVaultSession(): LoopVaultSession {
   const account = useCurrentAccount();
   const client = useSuiClient();
-  const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
+  const submit = useTxSubmit();
   const address = account?.address;
 
   const [sess, setSess] = useState<Session>({});
@@ -95,7 +96,7 @@ export function useLoopVaultSession(): LoopVaultSession {
         createStreak: !sess.streakId,
         owner: address,
       });
-      const { digest } = await signAndExecute({ transaction: tx });
+      const { digest } = await submit(tx);
       const res = await client.waitForTransaction({ digest, options: { showObjectChanges: true } });
       const created = parseOnboardingResult(res.objectChanges, CFG);
       const next: Session = {
@@ -109,7 +110,7 @@ export function useLoopVaultSession(): LoopVaultSession {
       setError((e as Error).message);
       setStatus("needs-onboarding");
     }
-  }, [address, client, sess.managerId, sess.streakId, signAndExecute]);
+  }, [address, client, sess.managerId, sess.streakId, submit]);
 
   return {
     address,
