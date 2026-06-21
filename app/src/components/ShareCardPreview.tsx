@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { binaryDownPrice, binaryUpPrice } from "../lib/delta";
+import { encodeCopy } from "../lib/copyTrade";
 import { fmtPct, fmtUsd, type MarketSnapshot } from "../lib/market";
 import type { OpenResult } from "./TradePanel";
 
@@ -48,12 +49,28 @@ export function ShareCardPreview({ pos, snap }: { pos: OpenResult | null; snap: 
   const money = (x: number) => `${x >= 0 ? "+" : "−"}${fmtUsd(Math.abs(x), 2)}`;
   const expMin = Math.max(0, (pos.expiryMs - snap.oracleTsMs) / 60_000);
 
+  // Captured here (pos is narrowed non-null) so the closure below doesn't re-narrow.
+  const copyPayload = {
+    oracleId: pos.oracleId ?? "",
+    expiryMs: pos.expiryMs,
+    strike: pos.strike,
+    isUp: pos.isUp,
+    direction: pos.direction,
+  };
+
   async function share() {
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const link = `${origin}/?copy=${encodeCopy(copyPayload)}`;
     const caption =
       `LoopVault — ${dir} BTC digital, ${money(netPnl)} (${up ? "+" : "−"}${fmtPct(Math.abs(netPct), 1)}), ` +
-      `delta-hedged on DeepBook. One tap, ~6s, no seed phrase.`;
+      `delta-hedged on DeepBook. One tap, ~6s, no seed phrase. Copy my trade: ${link}`;
     try {
-      await navigator.clipboard?.writeText(caption);
+      // Native share sheet on mobile; clipboard fallback on desktop.
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({ title: "LoopVault", text: caption, url: link });
+      } else {
+        await navigator.clipboard?.writeText(caption);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch {
@@ -107,7 +124,7 @@ export function ShareCardPreview({ pos, snap }: { pos: OpenResult | null; snap: 
       </div>
 
       <button className="btn" style={{ width: "100%", marginTop: 14 }} onClick={share}>
-        {copied ? "✓ Flex copied to clipboard" : "Share this trade"}
+        {copied ? "✓ Shared — copy-trade link included" : "Share this trade"}
       </button>
     </div>
   );

@@ -403,3 +403,26 @@ input.num {
   font-family: var(--font-mono);
   word-break: break-word;
 }
+
+/* ---- toast tones (honest success vs failure) ---- */
+.toast b { color: var(--text); }
+.toast-ok { border-color: rgba(40, 224, 160, 0.42); background: rgba(40, 224, 160, 0.08); }
+.toast-err { border-color: rgba(255, 84, 112, 0.42); background: rgba(255, 84, 112, 0.08); }
+.toast-warn { border-color: rgba(255, 194, 75, 0.42); background: rgba(255, 194, 75, 0.08); }
+.toast-info { border-color: var(--border-strong); }
+
+/* ---- hedge toggle row ---- */
+.checkrow input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--accent); flex: none; }
+
+/* ---- a11y: always-visible keyboard focus ---- */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+button { touch-action: manipulation; }
+
+/* ---- mobile-first polish ---- */
+@media (max-width: 880px) {
+  .shell { padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .hero h1 { font-size: 1.55rem; line-height: 1.22; }
+  .hero p { font-size: 13.5px; }
+  .topbar { flex-wrap: wrap; gap: 10px; }
+  .btn, .num, input[type="range"] { min-height: 44px; } /* comfortable touch targets */
+}

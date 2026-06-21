@@ -1,0 +1,13 @@
+{
+  "name": "LoopVault — one-tap hedged Predict",
+  "short_name": "LoopVault",
+  "description": "Open a DeepBook Predict position AND delta-hedge it on Spot in one signature, sealed by a SafeMint hot-potato. No seed phrase, gasless, on Sui.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#05070c",
+  "theme_color": "#05070c",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
