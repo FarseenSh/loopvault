@@ -197,6 +197,43 @@ fun test_deposit_then_offgrid_strike_rolls_back() {
     ts::end(sc);
 }
 
+// === Cross-language pricing golden vector ===
+
+// Pins the on-chain fair UP-digital price for fixed SVI params so the TS delta
+// engine can be proven to reproduce it (see app/src/lib/delta.test.ts golden test).
+// Params: a=0.01, b=0, rho=0, m=0, sigma=0.1; F=K=100 ⇒ k=0, w=a=0.01,
+// d2=-(w/2)/sqrt(w)=-0.05, UP = N(-0.05) = 0.4800612 (×1e9 = 480_061_xxx).
+#[test]
+fun test_compute_price_golden_atm_digital() {
+    let mut sc = ts::begin(USER);
+    let cap = oracle::create_oracle_cap(ts::ctx(&mut sc));
+    let _oracle_id = oracle::create_oracle(b"BTC".to_string(), EXPIRY_MS, ts::ctx(&mut sc));
+    let mut clock = clock::create_for_testing(ts::ctx(&mut sc));
+    clock::set_for_testing(&mut clock, START_MS);
+
+    ts::next_tx(&mut sc, USER);
+    let mut oracle = ts::take_shared<OracleSVI>(&sc);
+    oracle::register_cap(&mut oracle, &cap);
+    oracle::activate(&mut oracle, &cap, &clock);
+    oracle::update_prices(&mut oracle, &cap, oracle::new_price_data(SPOT, FORWARD), &clock);
+    oracle::update_svi(
+        &mut oracle,
+        &cap,
+        oracle::new_svi_params(SVI_A, 0, i64::zero(), i64::zero(), SVI_SIGMA),
+        &clock,
+    );
+
+    let up = oracle::compute_price(&oracle, STRIKE_ATM); // fair N(d2), ×1e9
+    // 0.4800612 ± 5e-5 — tight enough to catch a sign/convention bug, loose enough
+    // for the Cody-vs-A&S normCdf approximation gap (~1e-7).
+    assert!(up > 480_011_000 && up < 480_111_000, 0);
+
+    ts::return_shared(oracle);
+    unit_test::destroy(cap);
+    clock::destroy_for_testing(clock);
+    ts::end(sc);
+}
+
 // === Fixtures ===
 
 // Held-by-value objects that must survive across test_scenario tx boundaries.
