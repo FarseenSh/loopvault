@@ -29,6 +29,10 @@ export interface LoopVaultConfig {
   hedgeQuoteType: string;
   /** our published loopvault package id */
   loopvaultPkg: string;
+  /** coin decimals — needed to scale hedge legs into native units (verified on-chain) */
+  dusdcDecimals: number;
+  hedgeBaseDecimals: number;
+  hedgeQuoteDecimals: number;
 }
 
 /** Marks an id that must be resolved (Gate 0/3/4/5) before any live use. */
@@ -50,7 +54,10 @@ export const TESTNET: LoopVaultConfig = {
   deepType: "0x36dbef866a1d62bf7328989a10fb2f07d769f4ee587c0de4a0a256e57e0a58a8::deep::DEEP", // Gate 3
   hedgeBaseType: "0x6502dae813dbe5e42643c119a6450a518481f03063febc7e20238e43b6ea9e86::dbtc::DBTC", // Gate 3: DBTC (BTC base)
   hedgeQuoteType: "0xf7152c05930480cd740d7311b5b8b45c6f488e3a53a11c3f74a6fac36a52e0d7::DBUSDC::DBUSDC", // Gate 3: Spot quote (DBUSDC; != predict DUSDC on testnet)
-  loopvaultPkg: "0xaf1fdf8441f3d5f0c24beb095b8de144a789f2b76f6f7ca1e6cfc7fe130e18e1", // Gate 5: PUBLISHED to testnet (tx CHjn3Ns2E2o2hhP4n6xLWbj95kv6coKPLnvz3wKHNSoE)
+  loopvaultPkg: "0x7e8a79d1aa42cc453969f8765f67348e46fe51b08667b84c1e109b5d7d03fcf0", // PUBLISHED to testnet (tx 8qXSuH3bpxEMjnQYjaSs7W512pJXX5BDWoXkXoBb6ZiG) — seal binds cost+oracle on-chain
+  dusdcDecimals: 6, // verified on-chain via suix_getCoinMetadata
+  hedgeBaseDecimals: 8, // DBTC (BTC convention)
+  hedgeQuoteDecimals: 6, // DBUSDC
 };
 
 // Spot/DEEP are ALREADY live on mainnet; the Predict ids are filled day-1.
