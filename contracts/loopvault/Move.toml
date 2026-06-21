@@ -6,10 +6,13 @@ license = "Apache-2.0"
 
 [dependencies]
 # Framework (Sui + MoveStdlib) is added implicitly (Sui >= 1.45) and resolves to the
-# active env's on-chain system packages at publish time — so this package compiles
-# and publishes against testnet's framework with no rev to keep in sync. LoopVault is
-# self-contained (it does NOT depend on deepbook_predict — the Open PTB composes the
-# predict calls at the transaction layer, not as a Move dependency).
+# active env's on-chain system packages at publish time.
+#
+# loopvault depends on deepbook_predict so `safe_mint::consume` can re-derive the
+# REALIZED mint cost (predict::get_trade_amounts) and read the real oracle timestamp
+# ON-CHAIN — making the seal bind to protocol truth, not caller-supplied numbers.
+# Pinned to the same testnet commit the atomicity suite uses (predict-testnet-4-16).
+deepbook_predict = { git = "https://github.com/MystenLabs/deepbookv3.git", subdir = "packages/predict", rev = "1159d79af33c70e09e406310e1d8f067832ede9d" }
 
 [addresses]
 loopvault = "0x0"
