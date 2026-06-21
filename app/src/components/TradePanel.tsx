@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useSuiClientQuery } from "@mysten/dapp-kit";
 import { hedgeForPosition } from "../lib/delta";
 import { useTxSubmit } from "../hooks/useTxSubmit";
 import { classifyTxError } from "../lib/errors";
@@ -61,6 +62,14 @@ export function TradePanel({
 
   const account = !!session.address;
   const liveOracle = !!snap.oracleId; // a real on-chain OracleSVI to submit against
+
+  // Live DUSDC wallet balance (the capital available to stake).
+  const { data: balData } = useSuiClientQuery(
+    "getBalance",
+    { owner: session.address ?? "", coinType: CFG.dusdcType },
+    { enabled: !!session.address, refetchInterval: 5000 },
+  );
+  const dusdcBal = balData ? Number(balData.totalBalance) / 10 ** CFG.dusdcDecimals : null;
 
   const c = useMemo(() => {
     const strike = snap.forward; // ATM open
@@ -191,8 +200,23 @@ export function TradePanel({
 
       <div style={{ display: "flex", gap: 10 }}>
         <div style={{ flex: 1 }}>
-          <label className="field" htmlFor="lv-stake">Stake / capital (DUSDC)</label>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6 }}>
+            <label className="field" htmlFor="lv-stake">Stake / capital (DUSDC)</label>
+            {dusdcBal != null && (
+              <span style={{ fontSize: 11, color: "var(--text-faint)", whiteSpace: "nowrap" }}>
+                bal {fmtNum(dusdcBal, 2)}{" "}
+                <button type="button" className="linkbtn" onClick={() => setStake(Math.max(1, Math.floor(dusdcBal)))}>
+                  max
+                </button>
+              </span>
+            )}
+          </div>
           <input id="lv-stake" className="num" type="number" min={1} value={stake} onChange={(e) => setStake(Math.max(0, Number(e.target.value)))} />
+          {dusdcBal != null && stake > dusdcBal && (
+            <div style={{ fontSize: 11, color: "var(--down)", marginTop: 3 }}>
+              Exceeds wallet balance ({fmtNum(dusdcBal, 2)} DUSDC) — tap “max”.
+            </div>
+          )}
         </div>
         <div style={{ flex: 1 }}>
           <label className="field" htmlFor="lv-size">Contracts (×$1)</label>
