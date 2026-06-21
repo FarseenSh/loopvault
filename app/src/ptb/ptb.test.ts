@@ -18,6 +18,9 @@ const cfg: LoopVaultConfig = {
   hedgeBaseType: "0xb9::wbtc::WBTC",
   hedgeQuoteType: "0xd5::dusdc::DUSDC",
   loopvaultPkg: "0xca",
+  dusdcDecimals: 6,
+  hedgeBaseDecimals: 8,
+  hedgeQuoteDecimals: 6,
 };
 
 // Extract the ordered list of `module::function` for every MoveCall command.
@@ -33,19 +36,17 @@ function moveCallLabels(tx: Transaction): string[] {
 
 const openArgs: OpenPositionArgs = {
   managerId: "0x111",
+  oracleId: "0xc4",
   isUp: true,
   strike: 100_000_000_000n,
   expiryMs: 87_400_000n,
   quantity: 1_000_000n,
-  costCharged: 480_000n,
-  capitalBase: 10_000_000n,
+  capital: 10_000_000n,
   maxLossBps: 500n,
   oracleFreshnessDeadlineMs: 20_000n,
-  oracleTsMs: 1_000_000n,
   hedge: { side: "buy_base", quoteIn: 200_000n, minBaseOut: 1n },
   direction: 0,
   entryIvBps: 5_000n,
-  marketKeyBytes: [1, 2, 3],
   streakId: "0x222",
   recipient: "0x333",
 };
@@ -65,8 +66,8 @@ describe("buildOpenPositionPTB", () => {
     expect(idx("predict::mint")).toBeGreaterThan(idx("predict_manager::deposit"));
     expect(idx("pool::swap_exact_quote_for_base")).toBeGreaterThan(idx("predict::mint"));
     expect(idx("share_card::mint_to")).toBeGreaterThan(idx("pool::swap_exact_quote_for_base"));
-    expect(idx("streak::touch")).toBeGreaterThan(idx("share_card::mint_to"));
-    expect(idx("safe_mint::consume")).toBeGreaterThan(idx("streak::touch"));
+    expect(idx("streak::touch_if_due")).toBeGreaterThan(idx("share_card::mint_to"));
+    expect(idx("safe_mint::consume")).toBeGreaterThan(idx("streak::touch_if_due"));
   });
 
   it("sell_base hedge uses swap_exact_base_for_quote", () => {
